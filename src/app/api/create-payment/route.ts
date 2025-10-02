@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
       status: "pending",
       createdAt: serverTimestamp(),
       description: "Produto de Teste - Integração Next.js",
-      price: 10.5,
+      price: 1.99,
     };
 
     const paymentRef = await addDoc(collection(db, "payments"), paymentData);
