@@ -8,12 +8,14 @@ const client = new MercadoPagoConfig({
   accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN!,
 });
 
-export async function POST(_request: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    // !!! IMPORTANTE PARA TESTE LOCAL !!!
-    // Use a URL HTTPS que o ngrok gerou para você.
-    // Em produção, você voltaria a usar request.nextUrl.origin ou uma variável de ambiente.
-    const baseUrl = "https://832d8b2f7cbd.ngrok-free.app"; // <-- TROQUE PELA SUA URL DO NGROK
+    // Pega a URL base da variável de ambiente. É a forma correta para produção.
+    const baseUrl = process.env.APP_URL;
+
+    if (!baseUrl) {
+      throw new Error("A variável de ambiente APP_URL não está definida.");
+    }
 
     // Passo 1: Criar o documento de pagamento no Firebase com status 'pendente'
     console.log("Criando registro de pagamento no Firebase...");
@@ -46,32 +48,27 @@ export async function POST(_request: NextRequest) {
           },
         ],
         external_reference: paymentId,
-
-        // URLs para onde o usuário será redirecionado (AGORA COM HTTPS)
         back_urls: {
           success: `${baseUrl}/feedback?status=success`,
           failure: `${baseUrl}/feedback?status=failure`,
           pending: `${baseUrl}/feedback?status=pending`,
         },
         auto_return: "approved",
-
-        // URL de notificação para o Webhook (AGORA COM HTTPS)
         notification_url: `${baseUrl}/api/webhook`,
       },
     });
 
     console.log("Preferência criada. Redirecionando usuário...");
 
-    // Passo 3: Retornar a URL de pagamento para o frontend
     return NextResponse.json({
       id: preferenceData.id,
       init_point: preferenceData.init_point,
     });
   } catch (error) {
     console.error("Erro ao criar pagamento:", error);
-    return NextResponse.json(
-      { error: "Falha ao criar o pagamento." },
-      { status: 500 }
-    );
+    // Em um erro, é melhor retornar uma mensagem genérica para o usuário
+    const errorMessage =
+      error instanceof Error ? error.message : "Falha ao criar o pagamento.";
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
