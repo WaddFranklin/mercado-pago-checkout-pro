@@ -54,7 +54,7 @@ export default function HomePage() {
           </p>
 
           <Button onClick={handlePayment} disabled={isLoading} size="lg">
-            {isLoading ? "Processando..." : "Pagar R$ 10,50"}
+            {isLoading ? "Processando..." : "Pagar R$ 1,99"}
           </Button>
 
           {error && <p className="text-red-500 mt-4">{error}</p>}

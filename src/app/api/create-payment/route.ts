@@ -8,16 +8,14 @@ const client = new MercadoPagoConfig({
   accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN!,
 });
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
-    // Pega a URL base da variável de ambiente. É a forma correta para produção.
     const baseUrl = process.env.APP_URL;
 
     if (!baseUrl) {
       throw new Error("A variável de ambiente APP_URL não está definida.");
     }
 
-    // Passo 1: Criar o documento de pagamento no Firebase com status 'pendente'
     console.log("Criando registro de pagamento no Firebase...");
 
     const paymentData = {
@@ -32,7 +30,6 @@ export async function POST(request: NextRequest) {
 
     console.log(`Registro de pagamento criado com ID: ${paymentId}`);
 
-    // Passo 2: Criar a preferência de pagamento no Mercado Pago
     console.log("Criando preferência de pagamento no Mercado Pago...");
     const preference = new Preference(client);
 
@@ -43,10 +40,17 @@ export async function POST(request: NextRequest) {
             id: paymentId,
             title: "Produto de Exemplo",
             quantity: 1,
-            unit_price: 10.5,
+            unit_price: 1.99,
             currency_id: "BRL",
           },
         ],
+        // 👇 ADIÇÃO PARA HABILITAR PIX E OUTROS MÉTODOS
+        payment_methods: {
+          excluded_payment_types: [
+            { id: "ticket" }, // Exemplo: Exclui o pagamento por Boleto
+          ],
+          installments: 1, // Define o número máximo de parcelas (1 para não permitir parcelamento)
+        },
         external_reference: paymentId,
         back_urls: {
           success: `${baseUrl}/feedback?status=success`,
@@ -66,7 +70,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Erro ao criar pagamento:", error);
-    // Em um erro, é melhor retornar uma mensagem genérica para o usuário
     const errorMessage =
       error instanceof Error ? error.message : "Falha ao criar o pagamento.";
     return NextResponse.json({ error: errorMessage }, { status: 500 });
