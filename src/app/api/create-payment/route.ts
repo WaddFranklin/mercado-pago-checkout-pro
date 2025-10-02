@@ -8,7 +8,7 @@ const client = new MercadoPagoConfig({
   accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN!,
 });
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     // !!! IMPORTANTE PARA TESTE LOCAL !!!
     // Use a URL HTTPS que o ngrok gerou para você.

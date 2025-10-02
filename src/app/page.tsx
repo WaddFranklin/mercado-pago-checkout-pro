@@ -17,8 +17,6 @@ export default function HomePage() {
         headers: {
           "Content-Type": "application/json",
         },
-        // Você pode enviar dados do produto/usuário no corpo da requisição se precisar
-        // body: JSON.stringify({ productId: '123', quantity: 1 }),
       });
 
       const data = await response.json();
@@ -29,13 +27,18 @@ export default function HomePage() {
         );
       }
 
-      // Se a resposta for bem-sucedida, redirecione o usuário para a URL de pagamento
       if (data.init_point) {
         window.location.href = data.init_point;
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      // <-- CORREÇÃO AQUI: de 'any' para 'unknown'
       console.error(err);
-      setError(err.message);
+      // Verificamos se o erro é uma instância de Error para acessar a propriedade message com segurança
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("Ocorreu um erro inesperado.");
+      }
       setIsLoading(false);
     }
   };
