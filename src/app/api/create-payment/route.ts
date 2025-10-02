@@ -44,12 +44,15 @@ export async function POST(_request: NextRequest) {
             currency_id: "BRL",
           },
         ],
-        // 👇 ADIÇÃO PARA HABILITAR PIX E OUTROS MÉTODOS
+        // 👇 CONFIGURAÇÃO EXPLÍCITA PARA ACEITAR APENAS PIX E CARTÃO DE CRÉDITO
         payment_methods: {
           excluded_payment_types: [
-            { id: "ticket" }, // Exemplo: Exclui o pagamento por Boleto
+            // Excluímos tudo que NÃO é PIX ou Cartão de Crédito
+            { id: "ticket" }, // Exclui Boleto
+            { id: "atm" }, // Exclui Pagamento em Lotérica
           ],
-          installments: 1, // Define o número máximo de parcelas (1 para não permitir parcelamento)
+          // Definimos o número máximo de parcelas para o cartão de crédito
+          installments: 1,
         },
         external_reference: paymentId,
         back_urls: {
