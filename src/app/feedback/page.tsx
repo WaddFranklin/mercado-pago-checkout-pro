@@ -2,19 +2,58 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { doc, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { toast } from "sonner";
 
-// Um componente wrapper para usar o `useSearchParams` que requer Suspense
 function FeedbackContent() {
   const searchParams = useSearchParams();
 
-  // Pegamos os parâmetros da URL que o Mercado Pago nos enviou
-  const status = searchParams.get("status");
+  const initialStatus = searchParams.get("status");
   const paymentId = searchParams.get("payment_id");
   const externalReference = searchParams.get("external_reference");
 
+  const [currentStatus, setCurrentStatus] = useState(initialStatus);
+
+  useEffect(() => {
+    if (!externalReference) return;
+
+    const docRef = doc(db, "payments", externalReference);
+
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const newStatus = data.status;
+
+        if (currentStatus !== newStatus) {
+          if (newStatus === "approved") {
+            // MUDANÇA 3: Usar a nova sintaxe do sonner
+            toast.success("Pagamento Aprovado! 🎉", {
+              description: "Sua compra foi confirmada com sucesso.",
+            });
+          } else if (
+            newStatus === "failure" ||
+            newStatus === "cancelled" ||
+            newStatus === "rejected"
+          ) {
+            // MUDANÇA 4: Usar a nova sintaxe do sonner para erro
+            toast.error("Pagamento Falhou", {
+              description: "Houve um problema com o seu pagamento.",
+            });
+          }
+        }
+
+        setCurrentStatus(newStatus);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [externalReference, currentStatus]);
+
+  // ... (o restante do código da função getFeedbackMessage e do return continua o mesmo)
   const getFeedbackMessage = () => {
-    switch (status) {
+    switch (currentStatus) {
       case "success":
       case "approved":
         return {
@@ -24,6 +63,7 @@ function FeedbackContent() {
           color: "text-green-500",
         };
       case "failure":
+      case "rejected":
         return {
           title: "Pagamento Recusado",
           message:
@@ -32,16 +72,15 @@ function FeedbackContent() {
         };
       case "pending":
         return {
-          title: "Pagamento Pendente",
+          title: "Processando seu Pagamento...",
           message:
-            "Seu pagamento está pendente de processamento. Avisaremos assim que for aprovado.",
+            "Seu pagamento está pendente. Avisaremos assim que for aprovado. Você pode aguardar nesta tela.",
           color: "text-yellow-500",
         };
       default:
         return {
-          title: "Ocorreu um erro",
-          message:
-            "Não foi possível identificar o status do seu pagamento. Entre em contato com o suporte.",
+          title: "Aguardando Status",
+          message: "Aguardando a confirmação do status do seu pagamento.",
           color: "text-gray-500",
         };
     }
@@ -58,13 +97,13 @@ function FeedbackContent() {
         <p className="text-lg max-w-md">{feedback.message}</p>
         <div className="mt-4 p-4 border rounded-md bg-gray-50 text-left text-sm text-gray-700">
           <p>
-            <strong>Status:</strong> {status || "N/A"}
+            <strong>Status Atual:</strong> {currentStatus || "N/A"}
           </p>
           <p>
-            <strong>ID do Pagamento:</strong> {paymentId || "N/A"}
+            <strong>ID do Pagamento (MP):</strong> {paymentId || "N/A"}
           </p>
           <p>
-            <strong>Referência Externa (ID do Pedido):</strong>{" "}
+            <strong>ID do Pedido (Firebase):</strong>{" "}
             {externalReference || "N/A"}
           </p>
         </div>
@@ -78,11 +117,8 @@ function FeedbackContent() {
   );
 }
 
-// A página principal que exportamos
 export default function FeedbackPage() {
   return (
-    // O `useSearchParams` deve ser usado dentro de um boundary <Suspense>
-    // Esta é uma boa prática no Next.js App Router
     <Suspense fallback={<div>Carregando...</div>}>
       <FeedbackContent />
     </Suspense>
