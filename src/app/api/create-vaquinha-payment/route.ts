@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-// CORREÇÃO: Removida a tentativa de importar 'PreferenceResponse'
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
-// CORREÇÃO 1: Definimos uma interface APENAS com a propriedade que falta nos tipos da biblioteca
 interface MissingPixData {
   point_of_interaction?: {
     transaction_data?: {
@@ -13,14 +11,12 @@ interface MissingPixData {
     };
   };
 }
-
 interface Participant {
   name: string;
   amount: number;
   status: 'pending' | 'paid';
   firebasePaymentId: string | null;
 }
-
 const client = new MercadoPagoConfig({
   accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN!,
 });
@@ -65,15 +61,23 @@ export async function POST(request: NextRequest) {
         },
         external_reference: externalReferenceId,
         notification_url: `${baseUrl}/api/webhook`,
+        // ADIÇÃO: Este parâmetro pode ajudar a forçar a geração do PIX
+        binary_mode: true,
       },
     });
 
-    // CORREÇÃO 2: Criamos um novo objeto com a tipagem correta, combinando a original com a nossa
+    // !! AÇÃO DE DEPURAÇÃO IMPORTANTE !!
+    // Vamos logar a resposta completa do Mercado Pago para ver o que está acontecendo.
+    console.log(
+      'RESPOSTA DO MERCADO PAGO:',
+      JSON.stringify(preferenceData, null, 2),
+    );
+
     const correctedPreferenceData = preferenceData as typeof preferenceData &
       MissingPixData;
-
     const qrCodeData =
       correctedPreferenceData.point_of_interaction?.transaction_data;
+
     if (!qrCodeData?.qr_code_base_64 || !qrCodeData?.qr_code) {
       throw new Error(
         'Não foi possível obter os dados do PIX do Mercado Pago.',
@@ -89,7 +93,6 @@ export async function POST(request: NextRequest) {
     const updatedParticipants = vaquinhaData.participants.map(
       (p: Participant, idx: number) => {
         if (idx === participantIndex) {
-          // Usamos o preferenceData original aqui, pois o 'id' existe no tipo base
           return { ...p, firebasePaymentId: preferenceData.id };
         }
         return p;
