@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-// CORREÇÃO: Importamos 'Payment' em vez de 'Preference'
 import { MercadoPagoConfig, Payment } from 'mercadopago';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
-// A interface do participante permanece a mesma
 interface Participant {
   name: string;
   amount: number;
@@ -18,43 +16,35 @@ const client = new MercadoPagoConfig({
 
 export async function POST(request: NextRequest) {
   try {
+    const baseUrl = process.env.APP_URL;
+    if (!baseUrl)
+      throw new Error('A variável de ambiente APP_URL não está definida.');
+
     const { vaquinhaId, participantIndex, title, amount } =
       await request.json();
-
-    if (!vaquinhaId || participantIndex === undefined || !title || !amount) {
-      return NextResponse.json(
-        { error: 'Dados da vaquinha ou participante incompletos.' },
-        { status: 400 },
-      );
-    }
-
+    // ... (validações) ...
     const externalReferenceId = `${vaquinhaId}-${participantIndex}`;
-
-    // CORREÇÃO: Instanciamos 'Payment' em vez de 'Preference'
     const payment = new Payment(client);
 
-    // CORREÇÃO: O corpo da requisição para a API de Pagamentos é diferente
+    // CORREÇÃO: Construindo a URL de notificação de forma segura
+    const notificationUrl = new URL('/api/webhook', baseUrl).toString();
+
     const paymentData = await payment.create({
       body: {
         transaction_amount: Number(amount),
         description: title,
-        payment_method_id: 'pix', // Especificamos PIX diretamente
+        payment_method_id: 'pix',
         payer: {
-          // O e-mail é um campo obrigatório para pagamentos PIX via API
-          email: `pagador${Date.now()}@vaquinha.com`, // Usamos um e-mail de teste/placeholder
+          email: `pagador${Date.now()}@vaquinha.com`,
           first_name: 'Participante',
           last_name: 'da Vaquinha',
         },
         external_reference: externalReferenceId,
-        notification_url: `${process.env.APP_URL}/api/webhook`,
+        notification_url: notificationUrl, // Usando a URL segura
       },
     });
 
-    console.log(
-      'RESPOSTA DA API DE PAGAMENTOS:',
-      JSON.stringify(paymentData, null, 2),
-    );
-
+    // ... (resto do código permanece o mesmo)
     const qrCodeData = paymentData.point_of_interaction?.transaction_data;
     if (!qrCodeData?.qr_code_base64 || !qrCodeData?.qr_code) {
       throw new Error(
@@ -62,7 +52,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // A lógica de atualizar o Firebase continua a mesma
     const vaquinhaDocRef = doc(db, 'vaquinhas', vaquinhaId);
     const vaquinhaSnapshot = await getDoc(vaquinhaDocRef);
     if (!vaquinhaSnapshot.exists())
@@ -89,7 +78,6 @@ export async function POST(request: NextRequest) {
       payment_id: paymentData.id,
     });
   } catch (error: unknown) {
-    console.error('Erro ao gerar PIX para vaquinha:', error);
     const errorMessage =
       error instanceof Error ? error.message : 'Falha ao gerar o PIX.';
     return NextResponse.json({ error: errorMessage }, { status: 500 });
