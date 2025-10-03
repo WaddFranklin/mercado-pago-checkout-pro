@@ -2,21 +2,20 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useParams } from 'next/navigation';
-import { doc, getDoc, onSnapshot, updateDoc } from 'firebase/firestore';
+// CORREÇÃO: Removido 'getDoc' e 'updateDoc' pois não são usados aqui
+import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { DollarSign, CheckCircle, Clock } from 'lucide-react'; // Instale `lucide-react`
+// CORREÇÃO: Removido 'DollarSign' pois não é usado
+import { CheckCircle, Clock } from 'lucide-react';
 import Image from 'next/image';
-
-// Instale lucide-react:
-// npm install lucide-react
 
 interface ParticipantData {
   name: string;
   amount: number;
   status: 'pending' | 'paid';
-  firebasePaymentId: string | null; // ID que o MP nos retorna, usado para buscar detalhes
+  firebasePaymentId: string | null;
 }
 
 interface VaquinhaData {
@@ -29,7 +28,6 @@ interface VaquinhaData {
   createdBy: string | null;
 }
 
-// Componente para exibir o QR Code e Copia e Cola
 function PixPaymentModal({
   pixData,
   onClose,
@@ -80,12 +78,12 @@ function PixPaymentModal({
 }
 
 function VaquinhaContent() {
-  const { id } = useParams(); // Pega o ID da URL (id da vaquinha no Firebase)
+  const { id } = useParams();
   const [vaquinha, setVaquinha] = useState<VaquinhaData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [generatingPix, setGeneratingPix] = useState<string | null>(null); // Armazena o ID do participante que está gerando o PIX
-  const [showPixModal, setShowPixModal] = useState(false);
+  const [generatingPix, setGeneratingPix] = useState<string | null>(null);
+  // CORREÇÃO: Removido estado 'showPixModal' pois era redundante. O modal abre quando 'currentPixData' não é nulo.
   const [currentPixData, setCurrentPixData] = useState<{
     qrCodeBase64: string;
     qrCodeText: string;
@@ -96,20 +94,20 @@ function VaquinhaContent() {
 
     const vaquinhaDocRef = doc(db, 'vaquinhas', id as string);
 
-    // Usa onSnapshot para ouvir em tempo real as mudanças na vaquinha
     const unsubscribe = onSnapshot(
       vaquinhaDocRef,
       (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data() as VaquinhaData;
-          setVaquinha({ ...data, id: docSnap.id });
+          setVaquinha(data);
           setLoading(false);
         } else {
           setError('Vaquinha não encontrada.');
           setLoading(false);
         }
       },
-      (err) => {
+      (err: Error) => {
+        // <-- CORREÇÃO AQUI
         console.error('Erro ao carregar vaquinha:', err);
         setError('Erro ao carregar vaquinha. Tente novamente.');
         setLoading(false);
@@ -126,18 +124,16 @@ function VaquinhaContent() {
     setGeneratingPix(participant.name);
 
     try {
-      // 1. Chamar nossa API para criar a preferência de pagamento (PIX)
       const response = await fetch('/api/create-vaquinha-payment', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          vaquinhaId: id, // ID da vaquinha
-          participantIndex: participantIndex, // Índice do participante
+          vaquinhaId: id,
+          participantIndex: participantIndex,
           title: `Pagamento Vaquinha: ${vaquinha.title} - ${participant.name}`,
           amount: participant.amount,
-          receiverPixKey: vaquinha.receiverPixKey,
         }),
       });
 
@@ -147,19 +143,20 @@ function VaquinhaContent() {
         throw new Error(data.error || 'Erro ao gerar PIX.');
       }
 
-      // 2. Receber o QR Code e o Código Copia e Cola
       if (data.qr_code_base64 && data.qr_code_text) {
         setCurrentPixData({
           qrCodeBase64: data.qr_code_base64,
           qrCodeText: data.qr_code_text,
         });
-        setShowPixModal(true);
       } else {
         toast.error('Não foi possível gerar os dados do PIX.');
       }
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || 'Erro ao gerar PIX.');
+    } catch (error: unknown) {
+      // <-- CORREÇÃO AQUI
+      console.error(error);
+      const message =
+        error instanceof Error ? error.message : 'Erro ao gerar PIX.';
+      toast.error(message);
     } finally {
       setGeneratingPix(null);
     }
@@ -177,7 +174,7 @@ function VaquinhaContent() {
         {error}
       </main>
     );
-  if (!vaquinha) return null; // Não deve acontecer se error for verificado
+  if (!vaquinha) return null;
 
   const totalPaid = vaquinha.participants
     .filter((p) => p.status === 'paid')
@@ -241,7 +238,7 @@ function VaquinhaContent() {
 
       <PixPaymentModal
         pixData={currentPixData}
-        onClose={() => setShowPixModal(false)}
+        onClose={() => setCurrentPixData(null)}
       />
     </main>
   );

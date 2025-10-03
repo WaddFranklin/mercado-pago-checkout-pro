@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react'; // Importar useEffect
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,9 +11,9 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { toast } from 'sonner';
 
 interface Participant {
-  id: string; // ID temporário para o React
+  id: string;
   name: string;
-  amount: number; // Agora será calculado
+  amount: number;
 }
 
 export default function CreateVaquinhaPage() {
@@ -21,14 +21,12 @@ export default function CreateVaquinhaPage() {
   const [description, setDescription] = useState('');
   const [totalAmount, setTotalAmount] = useState<number | ''>('');
   const [receiverPixKey, setReceiverPixKey] = useState('');
-  // Agora participants não precisa do 'amount' no estado inicial
   const [participants, setParticipants] = useState<Participant[]>([
     { id: Date.now().toString(), name: '', amount: 0 },
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
-  // useEffect para recalcular a divisão sempre que o valor total ou o número de participantes mudar
   useEffect(() => {
     if (totalAmount > 0 && participants.length > 0) {
       const amountPerParticipant =
@@ -39,7 +37,6 @@ export default function CreateVaquinhaPage() {
       setParticipants((prevParticipants) =>
         prevParticipants.map((p, index) => ({
           ...p,
-          // Adiciona o resto da divisão ao primeiro participante para a soma bater
           amount:
             index === 0
               ? parseFloat((amountPerParticipant + remainder).toFixed(2))
@@ -47,10 +44,9 @@ export default function CreateVaquinhaPage() {
         })),
       );
     }
-  }, [totalAmount, participants.length]); // Dependências: totalAmount e a QUANTIDADE de participantes
+  }, [totalAmount, participants.length]);
 
   const handleAddParticipant = () => {
-    // Adiciona um novo participante com nome vazio
     setParticipants([
       ...participants,
       { id: Date.now().toString(), name: '', amount: 0 },
@@ -84,8 +80,6 @@ export default function CreateVaquinhaPage() {
       return;
     }
 
-    // A validação de soma não é mais necessária, pois o cálculo é automático
-
     try {
       const vaquinhaRef = await addDoc(collection(db, 'vaquinhas'), {
         title,
@@ -104,7 +98,8 @@ export default function CreateVaquinhaPage() {
 
       toast.success('Vaquinha criada com sucesso!');
       router.push(`/vaquinha/${vaquinhaRef.id}`);
-    } catch (error) {
+    } catch (error: unknown) {
+      // <-- CORREÇÃO AQUI
       console.error('Erro ao criar vaquinha:', error);
       toast.error('Erro ao criar vaquinha. Tente novamente.');
     } finally {
@@ -118,7 +113,6 @@ export default function CreateVaquinhaPage() {
         Criar Nova Vaquinha
       </h1>
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Campos Título, Descrição, Valor Total e Chave PIX continuam iguais */}
         <div>
           <Label htmlFor="title">Título da Vaquinha</Label>
           <Input
@@ -178,7 +172,6 @@ export default function CreateVaquinhaPage() {
                 required
               />
             </div>
-            {/* O valor agora é apenas exibido, não editável */}
             <div className="text-right">
               <Label>Valor a Pagar</Label>
               <p className="font-bold text-lg">

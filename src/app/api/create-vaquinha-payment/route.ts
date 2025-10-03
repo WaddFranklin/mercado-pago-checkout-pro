@@ -65,7 +65,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Atualiza o array de participantes no documento da vaquinha com o ID da preferência do MP
     const vaquinhaDocRef = doc(db, 'vaquinhas', vaquinhaId);
     const vaquinhaSnapshot = await getDoc(vaquinhaDocRef);
     if (!vaquinhaSnapshot.exists()) {
@@ -87,10 +86,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       qr_code_base64: qrCodeData.qr_code_base64,
-      qr_code_text: qrCodeData.qr_code, // O campo correto é qr_code para o copia e cola
+      qr_code_text: qrCodeData.qr_code,
       preference_id: preferenceData.id,
     });
-  } catch (error) {
+  } catch (error: unknown) {
+    // <-- CORREÇÃO AQUI
     console.error('Erro ao gerar PIX para vaquinha:', error);
     const errorMessage =
       error instanceof Error ? error.message : 'Falha ao gerar o PIX.';

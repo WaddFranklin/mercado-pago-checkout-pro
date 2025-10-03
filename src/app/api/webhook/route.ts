@@ -16,7 +16,6 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    // --- INÍCIO DA VERIFICAÇÃO DE ASSINATURA ---
     const signature = request.headers.get('x-signature');
     const requestId = request.headers.get('x-request-id');
 
@@ -34,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     const manifest = `id:${body.data.id};request-id:${requestId};ts:${ts};`;
 
-    const hmac = crypto.createHmac('sha265', webhookSecret); // Corrigido para sha256
+    const hmac = crypto.createHmac('sha256', webhookSecret);
     hmac.update(manifest);
     const computedHash = hmac.digest('hex');
 
@@ -45,7 +44,6 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
-    // --- FIM DA VERIFICAÇÃO DE ASSINATURA ---
 
     console.log('Assinatura verificada com sucesso.');
 
@@ -90,11 +88,11 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ status: 'received' }, { status: 200 });
-  } catch (error) {
+  } catch (error: unknown) {
+    // <-- CORREÇÃO AQUI
     console.error('Erro no processamento do webhook:', error);
-    return NextResponse.json(
-      { error: 'Erro interno no servidor.' },
-      { status: 500 },
-    );
+    const errorMessage =
+      error instanceof Error ? error.message : 'Erro interno no servidor.';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
