@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
+// CORREÇÃO: Removida a tentativa de importar 'PreferenceResponse'
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
-// CORREÇÃO: Adicionada interface para tipagem
+// CORREÇÃO 1: Definimos uma interface APENAS com a propriedade que falta nos tipos da biblioteca
+interface MissingPixData {
+  point_of_interaction?: {
+    transaction_data?: {
+      qr_code_base_64?: string;
+      qr_code?: string;
+    };
+  };
+}
+
 interface Participant {
   name: string;
   amount: number;
@@ -31,11 +41,8 @@ export async function POST(request: NextRequest) {
     }
 
     const externalReferenceId = `${vaquinhaId}-${participantIndex}`;
-    console.log(
-      `Gerando PIX para vaquinha ${vaquinhaId}, participante ${participantIndex} com ref externa ${externalReferenceId}`,
-    );
-
     const preference = new Preference(client);
+
     const preferenceData = await preference.create({
       body: {
         items: [
@@ -61,8 +68,13 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const qrCodeData = preferenceData.point_of_interaction?.transaction_data;
-    if (!qrCodeData?.qr_code_base64 || !qrCodeData?.qr_code) {
+    // CORREÇÃO 2: Criamos um novo objeto com a tipagem correta, combinando a original com a nossa
+    const correctedPreferenceData = preferenceData as typeof preferenceData &
+      MissingPixData;
+
+    const qrCodeData =
+      correctedPreferenceData.point_of_interaction?.transaction_data;
+    if (!qrCodeData?.qr_code_base_64 || !qrCodeData?.qr_code) {
       throw new Error(
         'Não foi possível obter os dados do PIX do Mercado Pago.',
       );
@@ -74,10 +86,10 @@ export async function POST(request: NextRequest) {
       throw new Error('Vaquinha não encontrada no Firebase.');
 
     const vaquinhaData = vaquinhaSnapshot.data();
-    // CORREÇÃO: Usando a interface Participant para tipar 'p'
     const updatedParticipants = vaquinhaData.participants.map(
       (p: Participant, idx: number) => {
         if (idx === participantIndex) {
+          // Usamos o preferenceData original aqui, pois o 'id' existe no tipo base
           return { ...p, firebasePaymentId: preferenceData.id };
         }
         return p;
@@ -87,7 +99,7 @@ export async function POST(request: NextRequest) {
     await updateDoc(vaquinhaDocRef, { participants: updatedParticipants });
 
     return NextResponse.json({
-      qr_code_base64: qrCodeData.qr_code_base64,
+      qr_code_base_64: qrCodeData.qr_code_base_64,
       qr_code_text: qrCodeData.qr_code,
       preference_id: preferenceData.id,
     });

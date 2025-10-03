@@ -28,11 +28,12 @@ export default function CreateVaquinhaPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (totalAmount > 0 && participants.length > 0) {
+    // CORREÇÃO AQUI: Convertendo totalAmount para número antes da comparação
+    if (Number(totalAmount) > 0 && participants.length > 0) {
       const amountPerParticipant =
-        Math.floor((totalAmount * 100) / participants.length) / 100;
+        Math.floor((Number(totalAmount) * 100) / participants.length) / 100;
       const totalCalculated = amountPerParticipant * participants.length;
-      const remainder = totalAmount - totalCalculated;
+      const remainder = Number(totalAmount) - totalCalculated;
 
       setParticipants((prevParticipants) =>
         prevParticipants.map((p, index) => ({
@@ -84,7 +85,6 @@ export default function CreateVaquinhaPage() {
       const vaquinhaRef = await addDoc(collection(db, 'vaquinhas'), {
         title,
         description,
-        // CORREÇÃO: Conversão segura sem 'as any'
         totalAmount: parseFloat(String(totalAmount)),
         receiverPixKey,
         createdBy: null,
