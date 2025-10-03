@@ -2,19 +2,17 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useParams } from 'next/navigation';
-// CORREÇÃO: Removido 'getDoc' e 'updateDoc' pois não são usados aqui
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-// CORREÇÃO: Removido 'DollarSign' pois não é usado
 import { CheckCircle, Clock } from 'lucide-react';
 import Image from 'next/image';
 
 interface ParticipantData {
   name: string;
   amount: number;
-  status: 'pending' | 'paid';
+  status: 'pending' | 'paid' | string;
   firebasePaymentId: string | null;
 }
 
@@ -24,8 +22,6 @@ interface VaquinhaData {
   totalAmount: number;
   receiverPixKey: string;
   participants: ParticipantData[];
-  createdAt: any;
-  createdBy: string | null;
 }
 
 function PixPaymentModal({
@@ -36,38 +32,28 @@ function PixPaymentModal({
   onClose: () => void;
 }) {
   if (!pixData) return null;
-
   const handleCopy = () => {
     navigator.clipboard.writeText(pixData.qrCodeText);
     toast.success('Código PIX copiado!');
   };
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full text-center">
         <h2 className="text-2xl font-bold mb-4">Pagar via PIX</h2>
-        <p className="mb-4">
-          Escaneie o QR Code ou use o código Copia e Cola para realizar o
-          pagamento.
-        </p>
-
-        {pixData.qrCodeBase64 && (
-          <Image
-            src={`data:image/png;base64,${pixData.qrCodeBase64}`}
-            alt="QR Code PIX"
-            width={200}
-            height={200}
-            className="mx-auto my-4 border rounded-md"
-          />
-        )}
-
+        <p className="mb-4">Escaneie o QR Code ou use o código Copia e Cola.</p>
+        <Image
+          src={`data:image/png;base64,${pixData.qrCodeBase64}`}
+          alt="QR Code PIX"
+          width={200}
+          height={200}
+          className="mx-auto my-4 border rounded-md"
+        />
         <div className="mb-4 p-3 bg-gray-100 rounded-md text-sm break-all">
-          <p className="font-semibold mb-2">Código PIX (Copia e Cola):</p>
+          <p className="font-semibold mb-2">Código PIX:</p>
           <p>{pixData.qrCodeText}</p>
         </div>
-
         <Button onClick={handleCopy} className="w-full mb-3">
-          Copiar Código PIX
+          Copiar Código
         </Button>
         <Button variant="outline" onClick={onClose} className="w-full">
           Fechar
@@ -83,7 +69,6 @@ function VaquinhaContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [generatingPix, setGeneratingPix] = useState<string | null>(null);
-  // CORREÇÃO: Removido estado 'showPixModal' pois era redundante. O modal abre quando 'currentPixData' não é nulo.
   const [currentPixData, setCurrentPixData] = useState<{
     qrCodeBase64: string;
     qrCodeText: string;
@@ -91,15 +76,12 @@ function VaquinhaContent() {
 
   useEffect(() => {
     if (!id) return;
-
     const vaquinhaDocRef = doc(db, 'vaquinhas', id as string);
-
     const unsubscribe = onSnapshot(
       vaquinhaDocRef,
       (docSnap) => {
         if (docSnap.exists()) {
-          const data = docSnap.data() as VaquinhaData;
-          setVaquinha(data);
+          setVaquinha(docSnap.data() as VaquinhaData);
           setLoading(false);
         } else {
           setError('Vaquinha não encontrada.');
@@ -107,28 +89,24 @@ function VaquinhaContent() {
         }
       },
       (err: Error) => {
-        // <-- CORREÇÃO AQUI
         console.error('Erro ao carregar vaquinha:', err);
-        setError('Erro ao carregar vaquinha. Tente novamente.');
+        setError('Erro ao carregar vaquinha.');
         setLoading(false);
       },
     );
-
     return () => unsubscribe();
   }, [id]);
 
   const handleGeneratePix = async (participantIndex: number) => {
     if (!vaquinha) return;
-
     const participant = vaquinha.participants[participantIndex];
     setGeneratingPix(participant.name);
 
     try {
       const response = await fetch('/api/create-vaquinha-payment', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
+        // CORREÇÃO: O backend agora busca os dados do Firebase, só precisamos enviar os IDs
         body: JSON.stringify({
           vaquinhaId: id,
           participantIndex: participantIndex,
@@ -138,10 +116,7 @@ function VaquinhaContent() {
       });
 
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Erro ao gerar PIX.');
-      }
+      if (!response.ok) throw new Error(data.error || 'Erro ao gerar PIX.');
 
       if (data.qr_code_base64 && data.qr_code_text) {
         setCurrentPixData({
@@ -152,7 +127,6 @@ function VaquinhaContent() {
         toast.error('Não foi possível gerar os dados do PIX.');
       }
     } catch (error: unknown) {
-      // <-- CORREÇÃO AQUI
       console.error(error);
       const message =
         error instanceof Error ? error.message : 'Erro ao gerar PIX.';
@@ -164,13 +138,13 @@ function VaquinhaContent() {
 
   if (loading)
     return (
-      <main className="flex min-h-screen items-center justify-center p-8">
-        Carregando vaquinha...
+      <main className="flex min-h-screen items-center justify-center">
+        Carregando...
       </main>
     );
   if (error)
     return (
-      <main className="flex min-h-screen items-center justify-center p-8 text-red-500">
+      <main className="flex min-h-screen items-center justify-center text-red-500">
         {error}
       </main>
     );
@@ -184,19 +158,17 @@ function VaquinhaContent() {
     <main className="container mx-auto p-8 max-w-3xl">
       <h1 className="text-4xl font-bold mb-4 text-center">{vaquinha.title}</h1>
       <p className="text-gray-600 mb-6 text-center">{vaquinha.description}</p>
-
       <div className="bg-blue-50 p-6 rounded-lg shadow-sm mb-8 text-center">
         <h2 className="text-xl font-semibold text-blue-800">
-          Total da Vaquinha: R$ {vaquinha.totalAmount.toFixed(2)}
+          Total: R$ {vaquinha.totalAmount.toFixed(2)}
         </h2>
         <p className="text-blue-700 text-lg">
-          Arrecadado até agora:{' '}
+          Arrecadado:{' '}
           <span className="font-bold text-green-700">
             R$ {totalPaid.toFixed(2)}
           </span>
         </p>
       </div>
-
       <h2 className="text-2xl font-semibold mb-6">Participantes:</h2>
       <div className="space-y-4">
         {vaquinha.participants.map((participant, index) => (
@@ -205,10 +177,9 @@ function VaquinhaContent() {
             className="flex items-center justify-between bg-white p-4 rounded-lg shadow-md"
           >
             <div className="flex items-center space-x-3">
-              {participant.status === 'paid' && (
+              {participant.status === 'paid' ? (
                 <CheckCircle className="text-green-500" size={20} />
-              )}
-              {participant.status === 'pending' && (
+              ) : (
                 <Clock className="text-yellow-500" size={20} />
               )}
               <span className="text-lg font-medium">{participant.name}</span>
@@ -217,14 +188,14 @@ function VaquinhaContent() {
               <span className="text-lg font-bold text-gray-800">
                 R$ {participant.amount.toFixed(2)}
               </span>
-              {participant.status === 'pending' && (
+              {participant.status !== 'paid' && (
                 <Button
                   onClick={() => handleGeneratePix(index)}
                   disabled={generatingPix === participant.name}
                   size="sm"
                 >
                   {generatingPix === participant.name
-                    ? 'Gerando PIX...'
+                    ? 'Gerando...'
                     : 'Pagar PIX'}
                 </Button>
               )}
@@ -235,7 +206,6 @@ function VaquinhaContent() {
           </div>
         ))}
       </div>
-
       <PixPaymentModal
         pixData={currentPixData}
         onClose={() => setCurrentPixData(null)}
@@ -248,7 +218,7 @@ export default function VaquinhaPage() {
   return (
     <Suspense
       fallback={
-        <main className="flex min-h-screen items-center justify-center p-8">
+        <main className="flex min-h-screen items-center justify-center">
           Carregando...
         </main>
       }

@@ -3,6 +3,14 @@ import { MercadoPagoConfig, Preference } from 'mercadopago';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
+// CORREÇÃO: Adicionada interface para tipagem
+interface Participant {
+  name: string;
+  amount: number;
+  status: 'pending' | 'paid';
+  firebasePaymentId: string | null;
+}
+
 const client = new MercadoPagoConfig({
   accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN!,
 });
@@ -10,14 +18,11 @@ const client = new MercadoPagoConfig({
 export async function POST(request: NextRequest) {
   try {
     const baseUrl = process.env.APP_URL;
-
-    if (!baseUrl) {
+    if (!baseUrl)
       throw new Error('A variável de ambiente APP_URL não está definida.');
-    }
 
     const { vaquinhaId, participantIndex, title, amount } =
       await request.json();
-
     if (!vaquinhaId || participantIndex === undefined || !title || !amount) {
       return NextResponse.json(
         { error: 'Dados da vaquinha ou participante incompletos.' },
@@ -26,13 +31,11 @@ export async function POST(request: NextRequest) {
     }
 
     const externalReferenceId = `${vaquinhaId}-${participantIndex}`;
-
     console.log(
       `Gerando PIX para vaquinha ${vaquinhaId}, participante ${participantIndex} com ref externa ${externalReferenceId}`,
     );
 
     const preference = new Preference(client);
-
     const preferenceData = await preference.create({
       body: {
         items: [
@@ -67,12 +70,13 @@ export async function POST(request: NextRequest) {
 
     const vaquinhaDocRef = doc(db, 'vaquinhas', vaquinhaId);
     const vaquinhaSnapshot = await getDoc(vaquinhaDocRef);
-    if (!vaquinhaSnapshot.exists()) {
+    if (!vaquinhaSnapshot.exists())
       throw new Error('Vaquinha não encontrada no Firebase.');
-    }
+
     const vaquinhaData = vaquinhaSnapshot.data();
+    // CORREÇÃO: Usando a interface Participant para tipar 'p'
     const updatedParticipants = vaquinhaData.participants.map(
-      (p: any, idx: number) => {
+      (p: Participant, idx: number) => {
         if (idx === participantIndex) {
           return { ...p, firebasePaymentId: preferenceData.id };
         }
@@ -80,9 +84,7 @@ export async function POST(request: NextRequest) {
       },
     );
 
-    await updateDoc(vaquinhaDocRef, {
-      participants: updatedParticipants,
-    });
+    await updateDoc(vaquinhaDocRef, { participants: updatedParticipants });
 
     return NextResponse.json({
       qr_code_base64: qrCodeData.qr_code_base64,
@@ -90,7 +92,6 @@ export async function POST(request: NextRequest) {
       preference_id: preferenceData.id,
     });
   } catch (error: unknown) {
-    // <-- CORREÇÃO AQUI
     console.error('Erro ao gerar PIX para vaquinha:', error);
     const errorMessage =
       error instanceof Error ? error.message : 'Falha ao gerar o PIX.';

@@ -4,6 +4,14 @@ import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import crypto from 'crypto';
 
+// CORREÇÃO: Adicionada interface para tipagem
+interface Participant {
+  name: string;
+  amount: number;
+  status: 'pending' | 'paid' | string; // Permitir outros status do MP
+  firebasePaymentId: string | null;
+}
+
 const mercadoPagoAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN!;
 const webhookSecret = process.env.MERCADOPAGO_WEBHOOK_SECRET!;
 
@@ -11,41 +19,30 @@ const client = new MercadoPagoConfig({ accessToken: mercadoPagoAccessToken });
 const payment = new Payment(client);
 
 export async function POST(request: NextRequest) {
-  console.log('Webhook recebido!');
-
   try {
     const body = await request.json();
 
     const signature = request.headers.get('x-signature');
     const requestId = request.headers.get('x-request-id');
-
-    if (!signature || !requestId) {
-      console.error('Assinatura ou Request ID ausente.');
+    if (!signature || !requestId)
       return NextResponse.json(
         { error: 'Assinatura inválida.' },
         { status: 400 },
       );
-    }
 
     const parts = signature.split(',');
     const ts = parts.find((part) => part.startsWith('ts='))?.split('=')[1];
     const hash = parts.find((part) => part.startsWith('v1='))?.split('=')[1];
-
     const manifest = `id:${body.data.id};request-id:${requestId};ts:${ts};`;
-
     const hmac = crypto.createHmac('sha256', webhookSecret);
     hmac.update(manifest);
     const computedHash = hmac.digest('hex');
 
-    if (computedHash !== hash) {
-      console.error('Verificação de assinatura falhou.');
+    if (computedHash !== hash)
       return NextResponse.json(
         { error: 'Assinatura inválida.' },
         { status: 400 },
       );
-    }
-
-    console.log('Assinatura verificada com sucesso.');
 
     if (body.type === 'payment') {
       const paymentId = body.data.id;
@@ -66,8 +63,9 @@ export async function POST(request: NextRequest) {
 
           if (vaquinhaSnapshot.exists()) {
             const vaquinhaData = vaquinhaSnapshot.data();
+            // CORREÇÃO: Usando a interface Participant para tipar 'p'
             const updatedParticipants = vaquinhaData.participants.map(
-              (p: any, idx: number) => {
+              (p: Participant, idx: number) => {
                 if (idx === participantIndex) {
                   return { ...p, status: newStatus };
                 }
@@ -77,19 +75,15 @@ export async function POST(request: NextRequest) {
             await updateDoc(vaquinhaDocRef, {
               participants: updatedParticipants,
             });
-            console.log(`Vaquinha ${vaquinhaId} atualizada com sucesso.`);
           }
         } else {
           const paymentDocRef = doc(db, 'payments', fullExternalReference);
           await updateDoc(paymentDocRef, { status: newStatus });
-          console.log(`Pagamento simples ${fullExternalReference} atualizado.`);
         }
       }
     }
-
-    return NextResponse.json({ status: 'received' }, { status: 200 });
+    return NextResponse.json({ status: 'received' });
   } catch (error: unknown) {
-    // <-- CORREÇÃO AQUI
     console.error('Erro no processamento do webhook:', error);
     const errorMessage =
       error instanceof Error ? error.message : 'Erro interno no servidor.';

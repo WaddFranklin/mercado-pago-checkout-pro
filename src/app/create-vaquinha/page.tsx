@@ -84,7 +84,8 @@ export default function CreateVaquinhaPage() {
       const vaquinhaRef = await addDoc(collection(db, 'vaquinhas'), {
         title,
         description,
-        totalAmount: parseFloat(totalAmount as any),
+        // CORREÇÃO: Conversão segura sem 'as any'
+        totalAmount: parseFloat(String(totalAmount)),
         receiverPixKey,
         createdBy: null,
         createdAt: serverTimestamp(),
@@ -99,7 +100,6 @@ export default function CreateVaquinhaPage() {
       toast.success('Vaquinha criada com sucesso!');
       router.push(`/vaquinha/${vaquinhaRef.id}`);
     } catch (error: unknown) {
-      // <-- CORREÇÃO AQUI
       console.error('Erro ao criar vaquinha:', error);
       toast.error('Erro ao criar vaquinha. Tente novamente.');
     } finally {
